@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Initialize Resend with API key from environment
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resend client will be initialized at runtime, not build time
 
 // Rate limiting - simple in-memory store (for production, use Redis)
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
@@ -78,6 +77,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Initialize Resend client at runtime (not build time)
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const contactEmail = process.env.CONTACT_EMAIL || 'info@solveprint.co.uk';
