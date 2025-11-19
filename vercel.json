@@ -1,0 +1,21 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "regions": ["lhr1"],
+  "env": {
+    "RESEND_API_KEY": {
+      "description": "Resend API key from https://resend.com/api-keys"
+    },
+    "FROM_EMAIL": {
+      "description": "From email address (use onboarding@resend.dev for testing)",
+      "value": "onboarding@resend.dev"
+    },
+    "CONTACT_EMAIL": {
+      "description": "Email to receive form submissions",
+      "value": "info@solveprint.co.uk"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# robots.txt for SolvePrint Contact Form
+
+User-agent: *
+Allow: /
+
+# Sitemap (update with your actual URL)
+Sitemap: https://YOUR-VERCEL-URL.vercel.app/sitemap.xml
