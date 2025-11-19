@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Resend client will be initialized at runtime, not build time
-
-// Rate limiting - simple in-memory store (for production, use Redis)
+// Rate limiting - simple in-memory store
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const MAX_REQUESTS = 3; // Max 3 requests per minute per IP
@@ -69,20 +67,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify Resend API key is configured
+    // Check environment variables
     if (!process.env.RESEND_API_KEY) {
-      console.error('RESEND_API_KEY not configured');
+      console.error('❌ RESEND_API_KEY not configured');
       return NextResponse.json(
         { error: 'Email service not configured' },
         { status: 500 }
       );
     }
 
-    // Initialize Resend client at runtime (not build time)
+    console.log('✅ Environment variables present');
+    console.log('📧 Attempting to send emails...');
+
+    // Initialize Resend client at runtime
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const contactEmail = process.env.CONTACT_EMAIL || 'info@solveprint.co.uk';
+
+    console.log(`📤 From: ${fromEmail}`);
+    console.log(`📥 To: ${contactEmail}`);
 
     // Email to company
     const companyEmailHtml = `
@@ -92,10 +96,10 @@ export async function POST(request: NextRequest) {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .header { background: #22a555; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
           .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
           .field { margin-bottom: 15px; }
-          .label { font-weight: bold; color: #667eea; }
+          .label { font-weight: bold; color: #22a555; }
           .value { margin-top: 5px; padding: 10px; background: white; border-radius: 4px; }
           .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
         </style>
@@ -158,7 +162,7 @@ export async function POST(request: NextRequest) {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .header { background: #22a555; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
           .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
           .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 14px; color: #666; }
         </style>
@@ -182,13 +186,13 @@ export async function POST(request: NextRequest) {
             </ul>
             
             <p>If you need immediate assistance, please don't hesitate to call us:</p>
-            <p style="font-size: 18px; color: #667eea;"><strong>07743 730963</strong></p>
+            <p style="font-size: 18px; color: #22a555;"><strong>07743 730963</strong></p>
             
             <div class="footer">
               <p><strong>SolvePrint</strong></p>
               <p>
-                Email: <a href="mailto:info@solveprint.co.uk" style="color: #667eea;">info@solveprint.co.uk</a><br>
-                Phone: <a href="tel:07743730963" style="color: #667eea;">07743 730963</a>
+                Email: <a href="mailto:info@solveprint.co.uk" style="color: #22a555;">info@solveprint.co.uk</a><br>
+                Phone: <a href="tel:07743730963" style="color: #22a555;">07743 730963</a>
               </p>
             </div>
           </div>
@@ -197,30 +201,39 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
+    // Send email to company
     try {
-      // Send email to company
-      await resend.emails.send({
+      console.log('📨 Sending company notification...');
+      const companyResult = await resend.emails.send({
         from: fromEmail,
         to: contactEmail,
         subject: `New Contact Form Submission - ${serviceType || 'General Inquiry'}`,
         html: companyEmailHtml,
       });
+      console.log('✅ Company email sent:', companyResult);
+    } catch (companyError: any) {
+      console.error('❌ Company email error:', companyError);
+      console.error('Error details:', JSON.stringify(companyError, null, 2));
+      // Don't return error yet, try customer email
+    }
 
-      // Send auto-reply to customer
-      await resend.emails.send({
+    // Send auto-reply to customer
+    try {
+      console.log('📨 Sending customer auto-reply...');
+      const customerResult = await resend.emails.send({
         from: fromEmail,
         to: email,
         subject: 'Thank you for contacting SolvePrint',
         html: customerEmailHtml,
       });
-
-    } catch (emailError) {
-      console.error('Email sending error:', emailError);
-      // Continue even if email fails - log for review
+      console.log('✅ Customer email sent:', customerResult);
+    } catch (customerError: any) {
+      console.error('❌ Customer email error:', customerError);
+      console.error('Error details:', JSON.stringify(customerError, null, 2));
     }
 
     // Log submission
-    console.log('Form submission received:', {
+    console.log('📝 Form submission logged:', {
       timestamp: new Date().toISOString(),
       serviceType,
       name,
@@ -238,10 +251,11 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
 
-  } catch (error) {
-    console.error('Form submission error:', error);
+  } catch (error: any) {
+    console.error('💥 Form submission error:', error);
+    console.error('Error stack:', error.stack);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error: ' + error.message },
       { status: 500 }
     );
   }
